@@ -184,14 +184,15 @@ function renderApp() {
 function renderDash(clients,tasks,commission,events) {
   const w=el("div","display:flex;flex-direction:column;gap:14px");
   const sold=clients.filter(c=>c.status==="Sold"),uo=clients.filter(c=>c.status==="Under Offer"),cur=clients.filter(c=>c.status==="Current"),lost=clients.filter(c=>c.status==="Lost Lead");
-  const totG=commission.reduce((a,c)=>a+c.salePrice*c.commPct/100,0), totV=totG*0.15, totN=totG-totV;
-  const paidN=commission.filter(c=>c.paid).reduce((a,c)=>{const g=c.salePrice*c.commPct/100;return a+(g-g*0.15);},0);
+  const totG=commission.reduce((a,c)=>a+c.salePrice*c.commPct/100,0), totV=totG*0.21, totN=totG-totV;
+  const totPersonal=commission.reduce((a,c)=>{const g=c.salePrice*c.commPct/100,n=g-g*0.21;return a+n*c.splitPct/100;},0);
+  const paidPersonal=commission.filter(c=>c.paid).reduce((a,c)=>{const g=c.salePrice*c.commPct/100,n=g-g*0.21;return a+n*c.splitPct/100;},0);
   // Stat cards
   const cards=el("div","display:flex;gap:10px;flex-wrap:wrap");
   [["🏠","Active",cur.length,"#3B82F6","#EFF6FF"],["🤝","Under Offer",uo.length,"#F59E0B","#FFFBEB"],["✅","Sold",sold.length,"#10B981","#ECFDF5"],["📉","Lost",lost.length,"#EF4444","#FEF2F2"]].forEach(([ic,lb,v,c,bg])=>{ const d=el("div",`background:${bg};border-radius:12px;padding:14px 16px;border-left:4px solid ${c};flex:1;min-width:100px`); d.innerHTML=`<div style="font-size:20px">${ic}</div><div style="font-size:26px;font-weight:800;color:${c}">${v}</div><div style="font-size:11px;color:#64748B">${lb}</div>`; cards.appendChild(d); });
   // Comm
-  const cb=el("div","background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06)","<div style='font-weight:700;color:#1E1B4B;margin-bottom:10px;font-size:14px'>💰 Commission Summary</div>");
-  [["Net to Agency",totN,"#10B981"],["Net Received",paidN,"#10B981"],["Net Pending",totN-paidN,"#F59E0B"]].forEach(([l,v,c])=>{ const r=el("div","display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAFC;font-size:13px"); r.innerHTML=`<span style="color:#64748B">${l}</span><span style="font-weight:700;color:${c}">${fmt(v)}</span>`; cb.appendChild(r); });
+  const cb=el("div","background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06)","<div style='font-weight:700;color:#1E1B4B;margin-bottom:10px;font-size:14px'>💰 My Commission Summary</div>");
+  [["My Total Take-Home",totPersonal,"#10B981"],["Received",paidPersonal,"#10B981"],["Pending",totPersonal-paidPersonal,"#F59E0B"]].forEach(([l,v,c])=>{ const r=el("div","display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAFC;font-size:13px"); r.innerHTML=`<span style="color:#64748B">${l}</span><span style="font-weight:700;color:${c}">${fmt(v)}</span>`; cb.appendChild(r); });
   // Tasks
   const pending=tasks.filter(t=>!t.done);
   const tb=el("div","background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06);flex:1;min-width:180px",`<div style='font-weight:700;color:#1E1B4B;margin-bottom:10px;font-size:14px'>✅ Pending (${pending.length})</div>`);
@@ -296,14 +297,14 @@ function renderContacts(clients) {
 // ══════════════════════════════════════════════════════════════════════════════
 // COMMISSION
 // ══════════════════════════════════════════════════════════════════════════════
-function calcC(sp,cp,st){const g=sp*cp/100,v=g*0.15,n=g-v;return{gross:g,vat:v,net:n,agentNet:n*st/100};}
+function calcC(sp,cp,st){const g=sp*cp/100,v=g*0.21,n=g-v;return{gross:g,vat:v,net:n,agentNet:n*st/100};}
 function renderComm(commission) {
   const w=el("div");
   const totG=commission.reduce((a,c)=>a+c.salePrice*c.commPct/100,0),totV=totG*0.15,totN=totG-totV;
   const totA=commission.reduce((a,c)=>{const{net}=calcC(c.salePrice,c.commPct,c.splitPct);return a+net*c.splitPct/100;},0);
   const paidA=commission.filter(c=>c.paid).reduce((a,c)=>{const{net}=calcC(c.salePrice,c.commPct,c.splitPct);return a+net*c.splitPct/100;},0);
   const cards=el("div","display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px");
-  [["Gross",totG,"#6366F1"],["VAT to SARS",totV,"#EF4444"],["Net Agency",totN,"#3B82F6"],["Your Share",totA,"#10B981"],["Pending",totA-paidA,"#F59E0B"]].forEach(([l,v,c])=>{ const d=el("div",`background:#fff;border-radius:10px;padding:10px 12px;border-left:4px solid ${c};flex:1;min-width:85px;box-shadow:0 1px 4px rgba(0,0,0,0.06)`); d.innerHTML=`<div style="font-size:10px;color:#64748B;font-weight:600">${l}</div><div style="font-size:13px;font-weight:800;color:${c};margin-top:2px">${fmt(v)}</div>`; cards.appendChild(d); });
+  [["Gross",totG,"#6366F1"],["VAT 21% to SARS",totV,"#EF4444"],["Net Agency",totN,"#3B82F6"],["My Take-Home",totA,"#10B981"],["Pending",totA-paidA,"#F59E0B"]].forEach(([l,v,c])=>{ const d=el("div",`background:#fff;border-radius:10px;padding:10px 12px;border-left:4px solid ${c};flex:1;min-width:85px;box-shadow:0 1px 4px rgba(0,0,0,0.06)`); d.innerHTML=`<div style="font-size:10px;color:#64748B;font-weight:600">${l}</div><div style="font-size:13px;font-weight:800;color:${c};margin-top:2px">${fmt(v)}</div>`; cards.appendChild(d); });
   const tr=el("div","display:flex;gap:6px;margin-bottom:14px;align-items:center");
   ["Pending","Paid"].forEach(t=>{ const a=commS.tab===t; const b=el("button",`padding:7px 18px;border-radius:20px;border:none;cursor:pointer;font-weight:600;font-size:12px;background:${a?(t==="Paid"?"#10B981":"#F59E0B"):"#E2E8F0"};color:${a?"#fff":"#64748B"}`,`${t==="Paid"?"✅":"⏳"} ${t} (${commission.filter(c=>t==="Paid"?c.paid:!c.paid).length})`); b.onclick=()=>{commS.tab=t;render();}; tr.appendChild(b); });
   const ab=el("button",BS("#10B981")+";margin-left:auto","+ Add Sale"); ab.onclick=()=>{commS.showModal=true;commS.form={property:"",salePrice:"",commPct:"5.5",splitPct:"60",paid:false};render();}; tr.appendChild(ab);
