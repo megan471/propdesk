@@ -1,17 +1,369 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>PropDesk CRM</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>"/>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #F1F5F9; min-height: 100vh; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',sans-serif;background:#F1F5F9;min-height:100vh}
+    input,select,textarea,button{font-family:'Segoe UI',sans-serif}
+    ::-webkit-scrollbar{width:6px}
+    ::-webkit-scrollbar-track{background:#F1F5F9}
+    ::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:3px}
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="app.js"></script>
+<div id="root"></div>
+
+<script type="module">
+import { initializeApp }                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ── FIREBASE CONFIG ───────────────────────────────────────────────────────────
+const app = initializeApp({
+  apiKey:            "AIzaSyC7MBDS3FVH1R-f_f96RU0QtuqCGZrBxf8",
+  authDomain:        "propdesk-8dd4c.firebaseapp.com",
+  databaseURL:       "https://propdesk-8dd4c-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "propdesk-8dd4c",
+  storageBucket:     "propdesk-8dd4c.firebasestorage.app",
+  messagingSenderId: "860690311625",
+  appId:             "1:860690311625:web:a45d93e850c176982b2018"
+});
+const db = getDatabase(app);
+const dbRef  = path => ref(db, path);
+const setDB  = (path, data) => set(dbRef(path), data);
+const delDB  = path => remove(dbRef(path));
+const updDB  = (path, data) => update(dbRef(path), data);
+const listen = (path, cb) => onValue(dbRef(path), s => cb(s.val()));
+
+// ── USERS ─────────────────────────────────────────────────────────────────────
+const USERS = [
+  { name:"Karen", pin:"1998", color:"#6366F1", icon:"👩‍💼" },
+  { name:"Megan", pin:"1995", color:"#EC4899", icon:"👩‍💻" },
+];
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const STATUSES = ["Current","Under Offer","Sold","Lost Lead"];
+const SC = { "Current":{bg:"#3B82F6",lt:"#EFF6FF"}, "Under Offer":{bg:"#F59E0B",lt:"#FFFBEB"}, "Sold":{bg:"#10B981",lt:"#ECFDF5"}, "Lost Lead":{bg:"#EF4444",lt:"#FEF2F2"} };
+const RC = { Buyer:"#8B5CF6", Seller:"#F59E0B", Both:"#10B981" };
+const PC = { High:"#EF4444", Medium:"#F59E0B", Low:"#10B981" };
+const EV = { Viewing:"#3B82F6", "Show Day":"#F59E0B" };
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const WDAYS  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const FIXED_DOCS    = ["Agreement","Lawyer Letter","Offer to Purchase","FICA Documents","Bond Application"];
+const MANDATE_TYPES = ["Exclusive Mandate","Open Mandate","Shared Mandate","Other Mandate"];
+const NAV = [
+  {key:"dashboard",icon:"📊",label:"Dashboard"},
+  {key:"clients",  icon:"🏠",label:"Clients"},
+  {key:"contacts", icon:"📋",label:"Contacts"},
+  {key:"commission",icon:"💰",label:"Commission"},
+  {key:"tasks",    icon:"✅",label:"Tasks"},
+  {key:"calendar", icon:"📅",label:"Calendar"},
+];
+
+const fmt  = n => "R " + Number(n).toLocaleString("en-ZA");
+const uid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+const el   = (t,s="",h="") => { const e=document.createElement(t); if(s) e.style.cssText=s; if(h) e.innerHTML=h; return e; };
+const inp  = (t,v,cb) => { const i=el("input",INP_S); i.type=t; i.value=v||""; i.oninput=e=>cb(e.target.value); return i; };
+const sel  = (opts,v,cb) => { const s=el("select",INP_S); opts.forEach(o=>{ const op=document.createElement("option"); op.value=o; op.textContent=o; if(o===v)op.selected=true; s.appendChild(op); }); s.onchange=e=>cb(e.target.value); return s; };
+const ta   = (v,cb) => { const t=el("textarea",INP_S+"height:55px;resize:vertical;"); t.value=v||""; t.oninput=e=>cb(e.target.value); return t; };
+const fld  = (lbl,child) => { const w=el("div","margin-bottom:10px"); w.appendChild(el("label","display:block;font-size:11px;font-weight:600;color:#64748B;margin-bottom:3px",lbl)); w.appendChild(child); return w; };
+const empt = t => el("div","text-align:center;color:#94A3B8;padding:24px 0;font-size:12px",t);
+const INP_S = "width:100%;border:1.5px solid #E2E8F0;border-radius:8px;padding:8px 10px;font-size:13px;color:#374151;outline:none;box-sizing:border-box;background:#FAFBFC;";
+const BS   = c => `background:${c};color:#fff;border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:600;font-size:13px`;
+const SB   = c => `background:${c}22;color:${c};border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:600;font-size:11px`;
+
+function modal(title, onClose) {
+  const ov=el("div","position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px");
+  const bx=el("div","background:#fff;border-radius:16px;padding:22px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2)");
+  const hd=el("div","display:flex;justify-content:space-between;align-items:center;margin-bottom:16px");
+  hd.appendChild(el("div","font-weight:800;font-size:16px;color:#1E1B4B",title));
+  const cl=el("button","background:none;border:none;font-size:18px;cursor:pointer;color:#94A3B8","✕"); cl.onclick=onClose;
+  hd.appendChild(cl); bx.appendChild(hd); ov.appendChild(bx);
+  return {ov,bx};
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let S = { user:null, tab:"dashboard", clients:{}, tasks:{}, commission:{}, events:{}, loading:true };
+let loginS = { selected:null, pin:"", error:"" };
+let clientS = { roleTab:"All", statusTab:"All", showModal:false, editId:null, viewId:null, form:{name:"",cell:"",email:"",address:"",price:"",status:"Current",role:"Buyer",notes:""} };
+let commS   = { tab:"Pending", showModal:false, form:{property:"",salePrice:"",commPct:"5.5",splitPct:"60",paid:false} };
+let taskS   = { filter:"Pending", showAdd:false, form:{title:"",date:"",priority:"Medium"} };
+let calS    = { year:new Date().getFullYear(), month:new Date().getMonth(), showModal:false, editId:null, form:{date:"",time:"09:00",type:"Viewing",address:"",client:"",notes:""} };
+let contactSearch = "";
+
+function render() {
+  const root = document.getElementById("root");
+  root.innerHTML = "";
+  root.appendChild(S.user ? renderApp() : renderLogin());
+}
+
+// ── LISTENERS ─────────────────────────────────────────────────────────────────
+listen("clients",    v=>{ S.clients=v||{};    render(); });
+listen("tasks",      v=>{ S.tasks=v||{};      render(); });
+listen("commission", v=>{ S.commission=v||{}; render(); });
+listen("events",     v=>{ S.events=v||{}; S.loading=false; render(); });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════════════════════════════════════════
+function renderLogin() {
+  const wrap=el("div","min-height:100vh;background:linear-gradient(135deg,#1E1B4B,#4338CA,#7C3AED);display:flex;align-items:center;justify-content:center");
+  const card=el("div","background:#fff;border-radius:24px;padding:36px 28px;width:90%;max-width:360px;box-shadow:0 30px 80px rgba(0,0,0,0.3);text-align:center");
+  card.innerHTML=`<div style="font-size:36px">🏡</div><div style="font-weight:800;font-size:22px;color:#1E1B4B;margin:4px 0 2px">PropDesk</div><div style="font-size:12px;color:#94A3B8;margin-bottom:24px">Property Agent CRM</div>`;
+
+  if (!loginS.selected) {
+    card.appendChild(el("div","font-weight:600;color:#374151;margin-bottom:16px;font-size:14px","Who's logging in?"));
+    const row=el("div","display:flex;gap:12px;justify-content:center");
+    USERS.forEach(u=>{ const b=el("button",`background:${u.color};color:#fff;border:none;border-radius:14px;padding:18px 28px;cursor:pointer;font-weight:700;font-size:15px;display:flex;flex-direction:column;align-items:center;gap:6px`); b.innerHTML=`<span style="font-size:28px">${u.icon}</span>${u.name}`; b.onclick=()=>{loginS={selected:u,pin:"",error:""};render();}; row.appendChild(b); });
+    card.appendChild(row);
+  } else {
+    const u=loginS.selected;
+    const hd=el("div","display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:20px");
+    hd.innerHTML=`<span style="font-size:22px">${u.icon}</span><span style="font-weight:700;font-size:16px;color:#1E1B4B">Hi, ${u.name}!</span>`;
+    const chg=el("button","background:none;border:none;color:#94A3B8;cursor:pointer;font-size:12px;margin-left:4px","Change"); chg.onclick=()=>{loginS={selected:null,pin:"",error:""};render();};
+    hd.appendChild(chg); card.appendChild(hd);
+    card.appendChild(el("div","font-weight:600;color:#374151;margin-bottom:16px;font-size:13px","Enter your 4-digit PIN"));
+    const dots=el("div","display:flex;gap:12px;justify-content:center;margin-bottom:20px");
+    for(let i=0;i<4;i++) dots.appendChild(el("div",`width:16px;height:16px;border-radius:50%;background:${i<loginS.pin.length?u.color:"#E2E8F0"}`));
+    card.appendChild(dots);
+    if(loginS.error) card.appendChild(el("div","color:#EF4444;font-size:12px;margin-bottom:12px;font-weight:600",loginS.error));
+    const grid=el("div","display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:220px;margin:0 auto");
+    [1,2,3,4,5,6,7,8,9,"",0,"⌫"].forEach(d=>{
+      const b=el("button",`padding:14px 0;border-radius:12px;border:1.5px solid #E2E8F0;background:${d==="⌫"?"#FEF2F2":"#F8FAFC"};color:${d==="⌫"?"#EF4444":"#1E1B4B"};font-weight:700;font-size:18px;cursor:${d===""?"default":"pointer"};opacity:${d===""?0:1}`,String(d));
+      b.onclick=()=>{
+        if(d==="")return;
+        if(d==="⌫"){loginS.pin=loginS.pin.slice(0,-1);loginS.error="";render();return;}
+        if(loginS.pin.length>=4)return;
+        loginS.pin+=d; loginS.error=""; render();
+        if(loginS.pin.length===4) setTimeout(()=>{ if(loginS.pin===u.pin){S.user=u;loginS={selected:null,pin:"",error:""};render();}else{loginS.error="Incorrect PIN. Try again.";loginS.pin="";render();} },200);
+      };
+      grid.appendChild(b);
+    });
+    card.appendChild(grid);
+  }
+  wrap.appendChild(card); return wrap;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// APP SHELL
+// ══════════════════════════════════════════════════════════════════════════════
+function renderApp() {
+  const wrap=el("div","display:flex;flex-direction:column;min-height:100vh");
+  // Header
+  const hdr=el("div","background:linear-gradient(90deg,#1E1B4B,#4338CA);color:#fff;padding:11px 16px;display:flex;align-items:center;justify-content:space-between");
+  hdr.innerHTML=`<div><span style="font-weight:800;font-size:17px">🏡 PropDesk</span><span style="font-size:11px;margin-left:8px;color:#A5B4FC">Property Agent CRM</span></div>`;
+  const badge=el("div","display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border-radius:20px;padding:5px 12px");
+  badge.innerHTML=`<span style="font-size:14px">${S.user.icon}</span><span style="font-size:12px;font-weight:600">${S.user.name}</span>`;
+  const lk=el("button","background:none;border:none;color:#A5B4FC;cursor:pointer;font-size:11px;margin-left:4px","🔒 Lock"); lk.onclick=()=>{S.user=null;render();};
+  badge.appendChild(lk); hdr.appendChild(badge);
+  // Nav
+  const nav=el("div","background:#fff;border-bottom:2px solid #E2E8F0;display:flex;overflow-x:auto");
+  NAV.forEach(n=>{ const b=el("button",`padding:11px 13px;border:none;background:none;cursor:pointer;font-weight:600;font-size:12px;white-space:nowrap;color:${S.tab===n.key?"#4338CA":"#64748B"};border-bottom:${S.tab===n.key?"3px solid #4338CA":"3px solid transparent"}`,`${n.icon} ${n.label}`); b.onclick=()=>{S.tab=n.key;render();}; nav.appendChild(b); });
+  // Content
+  const content=el("div","flex:1;overflow-y:auto;padding:16px");
+  if(S.loading){content.innerHTML=`<div style="text-align:center;padding:60px;color:#94A3B8">Loading... ⏳</div>`;}
+  else {
+    const clients=Object.values(S.clients), tasks=Object.values(S.tasks), commission=Object.values(S.commission), events=Object.values(S.events);
+    if(S.tab==="dashboard")  content.appendChild(renderDash(clients,tasks,commission,events));
+    if(S.tab==="clients")    content.appendChild(renderClients(clients));
+    if(S.tab==="contacts")   content.appendChild(renderContacts(clients));
+    if(S.tab==="commission") content.appendChild(renderComm(commission));
+    if(S.tab==="tasks")      content.appendChild(renderTasks(tasks));
+    if(S.tab==="calendar")   content.appendChild(renderCal(events,clients));
+  }
+  wrap.appendChild(hdr); wrap.appendChild(nav); wrap.appendChild(content);
+  return wrap;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════════════════════════════════════
+function renderDash(clients,tasks,commission,events) {
+  const w=el("div","display:flex;flex-direction:column;gap:14px");
+  const sold=clients.filter(c=>c.status==="Sold"),uo=clients.filter(c=>c.status==="Under Offer"),cur=clients.filter(c=>c.status==="Current"),lost=clients.filter(c=>c.status==="Lost Lead");
+  const totG=commission.reduce((a,c)=>a+c.salePrice*c.commPct/100,0), totV=totG*0.15, totN=totG-totV;
+  const paidN=commission.filter(c=>c.paid).reduce((a,c)=>{const g=c.salePrice*c.commPct/100;return a+(g-g*0.15);},0);
+  // Stat cards
+  const cards=el("div","display:flex;gap:10px;flex-wrap:wrap");
+  [["🏠","Active",cur.length,"#3B82F6","#EFF6FF"],["🤝","Under Offer",uo.length,"#F59E0B","#FFFBEB"],["✅","Sold",sold.length,"#10B981","#ECFDF5"],["📉","Lost",lost.length,"#EF4444","#FEF2F2"]].forEach(([ic,lb,v,c,bg])=>{ const d=el("div",`background:${bg};border-radius:12px;padding:14px 16px;border-left:4px solid ${c};flex:1;min-width:100px`); d.innerHTML=`<div style="font-size:20px">${ic}</div><div style="font-size:26px;font-weight:800;color:${c}">${v}</div><div style="font-size:11px;color:#64748B">${lb}</div>`; cards.appendChild(d); });
+  // Comm
+  const cb=el("div","background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06)","<div style='font-weight:700;color:#1E1B4B;margin-bottom:10px;font-size:14px'>💰 Commission Summary</div>");
+  [["Net to Agency",totN,"#10B981"],["Net Received",paidN,"#10B981"],["Net Pending",totN-paidN,"#F59E0B"]].forEach(([l,v,c])=>{ const r=el("div","display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F8FAFC;font-size:13px"); r.innerHTML=`<span style="color:#64748B">${l}</span><span style="font-weight:700;color:${c}">${fmt(v)}</span>`; cb.appendChild(r); });
+  // Tasks
+  const pending=tasks.filter(t=>!t.done);
+  const tb=el("div","background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06);flex:1;min-width:180px",`<div style='font-weight:700;color:#1E1B4B;margin-bottom:10px;font-size:14px'>✅ Pending (${pending.length})</div>`);
+  if(!pending.length) tb.appendChild(empt("All caught up! 🎉"));
+  pending.slice(0,4).forEach(t=>{ const r=el("div","display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid #F8FAFC"); r.innerHTML=`<div style="width:7px;height:7px;border-radius:50%;background:${PC[t.priority]};flex-shrink:0"></div><span style="font-size:12px;color:#374151">${t.title}</span>`; tb.appendChild(r); });
+  // Upcoming
+  const todayStr=new Date().toISOString().split("T")[0];
+  const up=events.filter(e=>e.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
+  const eb=el("div","background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06);flex:1;min-width:180px",`<div style='font-weight:700;color:#1E1B4B;margin-bottom:10px;font-size:14px'>📅 Upcoming (${up.length})</div>`);
+  if(!up.length) eb.appendChild(empt("No upcoming events."));
+  up.forEach(e=>{ const r=el("div","padding:5px 0;border-bottom:1px solid #F8FAFC"); r.innerHTML=`<div style="display:flex;align-items:center;gap:5px"><span style="background:${EV[e.type]};color:#fff;font-size:9px;padding:1px 6px;border-radius:10px;font-weight:700">${e.type}</span><span style="font-size:11px;color:#64748B">${e.date} ${e.time}</span></div><div style="font-size:12px;font-weight:600;color:#1E1B4B;margin-top:2px">${e.address}</div>`; eb.appendChild(r); });
+  const row=el("div","display:flex;gap:12px;flex-wrap:wrap"); row.appendChild(tb); row.appendChild(eb);
+  w.appendChild(cards); w.appendChild(cb); w.appendChild(row);
+  return w;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CLIENTS
+// ══════════════════════════════════════════════════════════════════════════════
+function renderClients(clients) {
+  const w=el("div");
+  // Role tabs
+  const rt=el("div","display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap");
+  ["All","Buyer","Seller"].forEach(r=>{ const a=clientS.roleTab===r; const b=el("button",`padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:600;font-size:11px;background:${a?(RC[r]||"#4338CA"):"#E2E8F0"};color:${a?"#fff":"#64748B"}`,`${r==="Buyer"?"🛒":r==="Seller"?"🏷️":"👥"} ${r}`); b.onclick=()=>{clientS.roleTab=r;render();}; rt.appendChild(b); });
+  // Status tabs
+  const st=el("div","display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center");
+  ["All",...STATUSES].forEach(s=>{ const a=clientS.statusTab===s; const b=el("button",`padding:5px 11px;border-radius:20px;border:none;cursor:pointer;font-weight:600;font-size:11px;background:${a?(SC[s]?.bg||"#4338CA"):"#E2E8F0"};color:${a?"#fff":"#64748B"}`,s); b.onclick=()=>{clientS.statusTab=s;render();}; st.appendChild(b); });
+  const ab=el("button",BS("#6366F1")+";margin-left:auto","+ Add Client"); ab.onclick=()=>{clientS.showModal=true;clientS.editId=null;clientS.form={name:"",cell:"",email:"",address:"",price:"",status:"Current",role:"Buyer",notes:""};render();}; st.appendChild(ab);
+  // List
+  const filtered=clients.filter(c=>(clientS.roleTab==="All"||c.role===clientS.roleTab||c.role==="Both")&&(clientS.statusTab==="All"||c.status===clientS.statusTab));
+  const list=el("div","display:flex;flex-direction:column;gap:10px");
+  if(!filtered.length) list.appendChild(empt("No clients match this filter."));
+  filtered.forEach(c=>{
+    const card=el("div",`background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 6px rgba(0,0,0,0.06);border-left:4px solid ${SC[c.status].bg}`);
+    card.innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px"><div style="font-weight:700;font-size:14px;color:#1E1B4B">${c.name}</div><div style="display:flex;gap:5px"><span style="background:${RC[c.role]}22;color:${RC[c.role]};font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700">${c.role==="Both"?"🛒🏷️ Both":c.role==="Buyer"?"🛒 Buyer":"🏷️ Seller"}</span><span style="background:${SC[c.status].bg};color:#fff;font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700">${c.status}</span></div></div><div style="font-size:12px;color:#64748B;margin-top:2px">📍 ${c.address}</div><div style="font-weight:800;color:#10B981;margin-top:3px;font-size:13px">${fmt(c.price)}</div><div style="margin-top:5px;font-size:12px;color:#374151">📱 ${c.cell} &nbsp;|&nbsp; ✉️ ${c.email}</div>${c.notes?`<div style="background:#F8FAFC;border-radius:6px;padding:4px 8px;margin-top:6px;font-size:11px;color:#64748B">📝 ${c.notes}</div>`:""}`;
+    const br=el("div","display:flex;gap:6px;margin-top:10px");
+    const db_=el("button",SB("#6366F1"),"📁 Docs"); db_.onclick=()=>{clientS.viewId=c.id;render();};
+    const eb=el("button",SB("#F59E0B"),"✏️ Edit"); eb.onclick=()=>{clientS.editId=c.id;clientS.form={...c};clientS.showModal=true;render();};
+    const dlb=el("button",SB("#EF4444"),"🗑 Delete"); dlb.onclick=()=>{if(confirm(`Delete ${c.name}?`))delDB(`clients/${c.id}`);};
+    br.appendChild(db_); br.appendChild(eb); br.appendChild(dlb); card.appendChild(br); list.appendChild(card);
+  });
+  w.appendChild(rt); w.appendChild(st); w.appendChild(list);
+  // Add/Edit Modal
+  if(clientS.showModal) {
+    const f=clientS.form; const m=modal(clientS.editId?"Edit Client":"Add Client",()=>{clientS.showModal=false;render();});
+    [["Full Name","name","text"],["Cell Number","cell","text"],["Email","email","email"],["Property Address","address","text"],["Price (R)","price","number"]].forEach(([l,k,t])=>m.bx.appendChild(fld(l,inp(t,f[k]||"",v=>{clientS.form[k]=v;}))));
+    m.bx.appendChild(fld("Role",sel(["Buyer","Seller","Both"],f.role,v=>{clientS.form.role=v;})));
+    m.bx.appendChild(fld("Status",sel(STATUSES,f.status,v=>{clientS.form.status=v;})));
+    m.bx.appendChild(fld("Notes",ta(f.notes||"",v=>{clientS.form.notes=v;})));
+    const sb=el("button",BS("#6366F1"),"Save Client"); sb.onclick=()=>{ if(!clientS.form.name)return; const data={...clientS.form,price:Number(clientS.form.price),docs:clientS.form.docs||{},mandates:clientS.form.mandates||[],customDocs:clientS.form.customDocs||[]}; if(clientS.editId)updDB(`clients/${clientS.editId}`,data); else{const id=uid();setDB(`clients/${id}`,{...data,id});}; clientS.showModal=false;render(); };
+    m.bx.appendChild(sb); w.appendChild(m.ov);
+  }
+  // Docs Modal
+  if(clientS.viewId) {
+    const c=clients.find(x=>x.id===clientS.viewId);
+    if(c){ const m=modal(`📁 ${c.name} — Documents`,()=>{clientS.viewId=null;render();});
+      m.bx.appendChild(el("div","font-size:12px;color:#64748B;margin-bottom:12px","Upload and manage all documents for this client."));
+      m.bx.appendChild(el("div","font-weight:700;font-size:12px;color:#374151;margin-bottom:6px","📋 Standard Documents"));
+      FIXED_DOCS.forEach(dt=>{ const doc=(c.docs||{})[dt]; const row=el("div",`background:${doc?"#ECFDF5":"#F8FAFC"};border-radius:9px;padding:9px 12px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center`); row.innerHTML=`<div><div style="font-weight:600;font-size:12px">📄 ${dt}</div><div style="font-size:10px;color:${doc?"#10B981":"#94A3B8"}">${doc?`✅ ${doc}`:"No file uploaded"}</div></div>`; const fi=document.createElement("input");fi.type="file";fi.accept=".pdf";fi.style.display="none";fi.onchange=e=>{const f=e.target.files[0];if(f)updDB(`clients/${c.id}/docs`,{...(c.docs||{}),[dt]:f.name});}; const ub=el("button",SB(doc?"#10B981":"#6366F1"),doc?"Replace":"Upload");ub.onclick=()=>fi.click(); row.appendChild(fi);row.appendChild(ub);m.bx.appendChild(row); });
+      m.bx.appendChild(el("div","font-weight:700;font-size:12px;color:#374151;margin:14px 0 6px","📑 Mandates"));
+      (c.mandates||[]).forEach((mn,i)=>{ const row=el("div","background:#ECFDF5;border-radius:9px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"); row.innerHTML=`<div><div style="font-weight:600;font-size:12px">📑 ${mn.label}</div><div style="font-size:10px;color:#10B981">✅ ${mn.fileName}</div></div>`; const rb=el("button",SB("#EF4444"),"Remove");rb.onclick=()=>{const u=[...(c.mandates||[])];u.splice(i,1);updDB(`clients/${c.id}`,{...c,mandates:u});};row.appendChild(rb);m.bx.appendChild(row); });
+      let selType=MANDATE_TYPES[0],custLbl="";
+      const mb=el("div","background:#F8FAFC;border-radius:9px;padding:10px 12px;margin-bottom:6px");
+      mb.appendChild(el("div","font-size:11px;font-weight:600;color:#374151;margin-bottom:6px","Add Mandate"));
+      const msel=sel(MANDATE_TYPES,selType,v=>{selType=v;custI.style.display=v==="Other Mandate"?"block":"none";}); mb.appendChild(msel);
+      const custI=inp("text","",v=>{custLbl=v;}); custI.placeholder="Custom label..."; custI.style.display="none"; custI.style.marginBottom="6px"; mb.appendChild(custI);
+      const mfi=document.createElement("input");mfi.type="file";mfi.accept=".pdf";mfi.style.display="none";mfi.onchange=e=>{const f=e.target.files[0];if(!f)return;const lbl=selType==="Other Mandate"?(custLbl||"Other Mandate"):selType;const u=[...(c.mandates||[]),{label:lbl,fileName:f.name}];updDB(`clients/${c.id}`,{...c,mandates:u});};
+      const mub=el("button",BS("#6366F1"),"📎 Upload Mandate PDF");mub.onclick=()=>mfi.click();
+      mb.appendChild(mfi);mb.appendChild(mub);m.bx.appendChild(mb);
+      m.bx.appendChild(el("div","font-weight:700;font-size:12px;color:#374151;margin:14px 0 6px","📎 Other Documents"));
+      (c.customDocs||[]).forEach((d,i)=>{ const row=el("div","background:#EFF6FF;border-radius:9px;padding:8px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"); row.innerHTML=`<div><div style="font-weight:600;font-size:12px">📎 ${d.label}</div><div style="font-size:10px;color:#3B82F6">✅ ${d.fileName}</div></div>`; const rb=el("button",SB("#EF4444"),"Remove");rb.onclick=()=>{const u=[...(c.customDocs||[])];u.splice(i,1);updDB(`clients/${c.id}`,{...c,customDocs:u});};row.appendChild(rb);m.bx.appendChild(row); });
+      let cdLbl="";
+      const cdb=el("div","background:#F8FAFC;border-radius:9px;padding:10px 12px");
+      cdb.appendChild(el("div","font-size:11px;font-weight:600;color:#374151;margin-bottom:6px","Add Custom Document"));
+      const cdI=inp("text","",v=>{cdLbl=v;}); cdI.placeholder="Document name..."; cdI.style.marginBottom="6px"; cdb.appendChild(cdI);
+      const cdfi=document.createElement("input");cdfi.type="file";cdfi.accept=".pdf";cdfi.style.display="none";cdfi.onchange=e=>{const f=e.target.files[0];if(!f||!cdLbl.trim())return;const u=[...(c.customDocs||[]),{label:cdLbl,fileName:f.name}];updDB(`clients/${c.id}`,{...c,customDocs:u});};
+      const cdub=el("button",BS("#6366F1"),"📎 Upload PDF");cdub.onclick=()=>{if(cdLbl.trim())cdfi.click();else alert("Enter a document name first.");};
+      cdb.appendChild(cdfi);cdb.appendChild(cdub);m.bx.appendChild(cdb);
+      w.appendChild(m.ov);
+    }
+  }
+  return w;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CONTACTS
+// ══════════════════════════════════════════════════════════════════════════════
+function renderContacts(clients) {
+  const w=el("div");
+  const si=inp("text",contactSearch,v=>{contactSearch=v;renderList();});
+  si.placeholder="🔍 Search name, email or cell..."; si.style.marginBottom="14px"; si.style.width="100%";
+  const list=el("div","display:flex;flex-direction:column;gap:8px");
+  function renderList(){
+    list.innerHTML="";
+    const f=clients.filter(c=>c.name.toLowerCase().includes(contactSearch.toLowerCase())||c.email.toLowerCase().includes(contactSearch.toLowerCase())||c.cell.includes(contactSearch));
+    if(!f.length){list.appendChild(empt("No contacts found."));return;}
+    f.forEach(c=>{ const row=el("div","background:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"); row.innerHTML=`<div><div style="font-weight:700;font-size:13px;color:#1E1B4B">${c.name}</div><div style="font-size:12px;color:#64748B">📱 ${c.cell} &nbsp;|&nbsp; ✉️ ${c.email}</div><div style="font-size:11px;color:#94A3B8">📍 ${c.address}</div></div><div style="display:flex;gap:5px"><span style="background:${RC[c.role]}22;color:${RC[c.role]};font-size:9px;padding:2px 7px;border-radius:20px;font-weight:700">${c.role}</span><span style="background:${SC[c.status].bg};color:#fff;font-size:9px;padding:2px 7px;border-radius:20px;font-weight:700">${c.status}</span></div>`; list.appendChild(row); });
+  }
+  renderList(); w.appendChild(si); w.appendChild(list); return w;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COMMISSION
+// ══════════════════════════════════════════════════════════════════════════════
+function calcC(sp,cp,st){const g=sp*cp/100,v=g*0.15,n=g-v;return{gross:g,vat:v,net:n,agentNet:n*st/100};}
+function renderComm(commission) {
+  const w=el("div");
+  const totG=commission.reduce((a,c)=>a+c.salePrice*c.commPct/100,0),totV=totG*0.15,totN=totG-totV;
+  const totA=commission.reduce((a,c)=>{const{net}=calcC(c.salePrice,c.commPct,c.splitPct);return a+net*c.splitPct/100;},0);
+  const paidA=commission.filter(c=>c.paid).reduce((a,c)=>{const{net}=calcC(c.salePrice,c.commPct,c.splitPct);return a+net*c.splitPct/100;},0);
+  const cards=el("div","display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px");
+  [["Gross",totG,"#6366F1"],["VAT to SARS",totV,"#EF4444"],["Net Agency",totN,"#3B82F6"],["Your Share",totA,"#10B981"],["Pending",totA-paidA,"#F59E0B"]].forEach(([l,v,c])=>{ const d=el("div",`background:#fff;border-radius:10px;padding:10px 12px;border-left:4px solid ${c};flex:1;min-width:85px;box-shadow:0 1px 4px rgba(0,0,0,0.06)`); d.innerHTML=`<div style="font-size:10px;color:#64748B;font-weight:600">${l}</div><div style="font-size:13px;font-weight:800;color:${c};margin-top:2px">${fmt(v)}</div>`; cards.appendChild(d); });
+  const tr=el("div","display:flex;gap:6px;margin-bottom:14px;align-items:center");
+  ["Pending","Paid"].forEach(t=>{ const a=commS.tab===t; const b=el("button",`padding:7px 18px;border-radius:20px;border:none;cursor:pointer;font-weight:600;font-size:12px;background:${a?(t==="Paid"?"#10B981":"#F59E0B"):"#E2E8F0"};color:${a?"#fff":"#64748B"}`,`${t==="Paid"?"✅":"⏳"} ${t} (${commission.filter(c=>t==="Paid"?c.paid:!c.paid).length})`); b.onclick=()=>{commS.tab=t;render();}; tr.appendChild(b); });
+  const ab=el("button",BS("#10B981")+";margin-left:auto","+ Add Sale"); ab.onclick=()=>{commS.showModal=true;commS.form={property:"",salePrice:"",commPct:"5.5",splitPct:"60",paid:false};render();}; tr.appendChild(ab);
+  const filtered=commission.filter(c=>commS.tab==="Paid"?c.paid:!c.paid);
+  const list=el("div","display:flex;flex-direction:column;gap:8px");
+  if(!filtered.length) list.appendChild(empt(`No ${commS.tab.toLowerCase()} commission entries yet.`));
+  filtered.forEach(c=>{ const{gross,vat,net,agentNet}=calcC(c.salePrice,c.commPct,c.splitPct); const card=el("div",`background:#fff;border-radius:12px;padding:13px 15px;box-shadow:0 1px 5px rgba(0,0,0,0.06);border-left:4px solid ${c.paid?"#10B981":"#F59E0B"}`); card.innerHTML=`<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px"><div><div style="font-weight:700;font-size:13px;color:#1E1B4B">${c.property}</div><div style="font-size:11px;color:#64748B">Sale: ${fmt(c.salePrice)} @ ${c.commPct}% | Split: ${c.splitPct}%</div></div></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px">${[["Gross",gross,"#6366F1"],["VAT",vat,"#EF4444"],["Net Agency",net,"#3B82F6"],["Your Share",agentNet,"#10B981"]].map(([l,v,col])=>`<div style="background:#F8FAFC;border-radius:7px;padding:6px 8px"><div style="font-size:9px;color:#94A3B8;font-weight:600">${l}</div><div style="font-size:11px;font-weight:800;color:${col}">${fmt(v)}</div></div>`).join("")}</div>`; const tb=el("button",SB(c.paid?"#F59E0B":"#10B981")+";margin-top:8px;margin-right:6px",c.paid?"⏳ Mark Pending":"✅ Mark Paid"); tb.onclick=()=>updDB(`commission/${c.id}`,{...c,paid:!c.paid}); const db=el("button",SB("#EF4444")+";margin-top:8px","Remove"); db.onclick=()=>{if(confirm("Remove?"))delDB(`commission/${c.id}`);}; card.appendChild(tb);card.appendChild(db);list.appendChild(card); });
+  w.appendChild(cards); w.appendChild(tr); w.appendChild(list);
+  if(commS.showModal){ const f=commS.form; const m=modal("Add Sale & Commission",()=>{commS.showModal=false;render();}); [["Property Address","property","text"],["Sale Price (R)","salePrice","number"],["Commission %","commPct","number"],["Your Split %","splitPct","number"]].forEach(([l,k,t])=>m.bx.appendChild(fld(l,inp(t,f[k],v=>{commS.form[k]=v;updPrev();})))); const prev=el("div","background:#F0FDF4;border-radius:10px;padding:12px 14px;margin-bottom:12px;display:none"); function updPrev(){if(!f.salePrice||!f.commPct)return;const{gross,vat,net,agentNet}=calcC(Number(f.salePrice),Number(f.commPct),Number(f.splitPct));prev.style.display="block";prev.innerHTML=`<div style="font-weight:700;font-size:12px;color:#065F46;margin-bottom:8px">💰 Breakdown</div>${[["Gross",gross,"#6366F1"],["VAT (15%)",vat,"#EF4444"],["Net Agency",net,"#3B82F6"],["Your Share ("+f.splitPct+"%)",agentNet,"#10B981"]].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid #D1FAE5"><span style="color:#374151">${l}</span><span style="font-weight:700;color:${c}">${fmt(v)}</span></div>`).join("")}`;} m.bx.appendChild(prev); const pr=el("div","display:flex;align-items:center;gap:8px;margin-bottom:14px"); const pc=document.createElement("input");pc.type="checkbox";pc.checked=f.paid;pc.onchange=e=>{commS.form.paid=e.target.checked;}; pr.appendChild(pc);pr.appendChild(el("label","font-size:13px","Mark as Paid"));m.bx.appendChild(pr); const sb=el("button",BS("#10B981"),"Save Sale");sb.onclick=()=>{if(!f.property||!f.salePrice)return;const id=uid();setDB(`commission/${id}`,{...f,id,salePrice:Number(f.salePrice),commPct:Number(f.commPct),splitPct:Number(f.splitPct)});commS.showModal=false;render();};m.bx.appendChild(sb);w.appendChild(m.ov); }
+  return w;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TASKS
+// ══════════════════════════════════════════════════════════════════════════════
+function renderTasks(tasks) {
+  const w=el("div");
+  const counts={All:tasks.length,Pending:tasks.filter(t=>!t.done).length,Completed:tasks.filter(t=>t.done).length};
+  const tr=el("div","display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center");
+  ["Pending","All","Completed"].forEach(f=>{ const b=el("button",`padding:6px 14px;border-radius:20px;border:none;cursor:pointer;font-weight:600;font-size:12px;background:${taskS.filter===f?"#F59E0B":"#E2E8F0"};color:${taskS.filter===f?"#fff":"#64748B"}`,`${f} (${counts[f]})`); b.onclick=()=>{taskS.filter=f;render();}; tr.appendChild(b); });
+  const ab=el("button",BS("#6366F1")+";margin-left:auto",taskS.showAdd?"Cancel":"+ Add Task"); ab.onclick=()=>{taskS.showAdd=!taskS.showAdd;render();}; tr.appendChild(ab);
+  w.appendChild(tr);
+  if(taskS.showAdd){ const box=el("div","background:#fff;border-radius:12px;padding:14px;margin-bottom:14px;box-shadow:0 1px 6px rgba(0,0,0,0.08)"); box.appendChild(fld("Task Description",inp("text",taskS.form.title,v=>{taskS.form.title=v;}))); const r2=el("div","display:flex;gap:8px;margin-bottom:10px"); const d1=el("div","flex:1");d1.appendChild(fld("Due Date",inp("date",taskS.form.date,v=>{taskS.form.date=v;}))); const d2=el("div","flex:1");d2.appendChild(fld("Priority",sel(["High","Medium","Low"],taskS.form.priority,v=>{taskS.form.priority=v;}))); r2.appendChild(d1);r2.appendChild(d2);box.appendChild(r2); const sb=el("button",BS("#6366F1"),"Add Task");sb.onclick=()=>{if(!taskS.form.title.trim())return;const id=uid();setDB(`tasks/${id}`,{...taskS.form,id,done:false});taskS.showAdd=false;taskS.form={title:"",date:"",priority:"Medium"};render();};box.appendChild(sb);w.appendChild(box); }
+  const filtered=tasks.filter(t=>taskS.filter==="All"?true:taskS.filter==="Completed"?t.done:!t.done);
+  const list=el("div","display:flex;flex-direction:column;gap:8px");
+  if(!filtered.length) list.appendChild(empt(taskS.filter==="Completed"?"No completed tasks yet.":"Nothing pending — all caught up! 🎉"));
+  filtered.forEach(t=>{ const row=el("div",`background:#fff;border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06);border-left:4px solid ${PC[t.priority]};opacity:${t.done?0.6:1}`); const chk=document.createElement("input");chk.type="checkbox";chk.checked=t.done;chk.style.cssText="margin-top:2px;width:16px;height:16px;cursor:pointer;accent-color:#6366F1";chk.onchange=()=>updDB(`tasks/${t.id}`,{...t,done:!t.done}); const info=el("div","flex:1"); info.innerHTML=`<div style="font-weight:600;font-size:13px;color:#1E1B4B;text-decoration:${t.done?"line-through":"none"}">${t.title}</div><div style="display:flex;gap:8px;margin-top:4px;align-items:center"><span style="background:${PC[t.priority]}22;color:${PC[t.priority]};font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px">${t.priority}</span>${t.date?`<span style="font-size:11px;color:#94A3B8">📅 ${t.date}</span>`:""}</div>`; const db=el("button","background:none;border:none;color:#CBD5E1;cursor:pointer;font-size:15px;padding:0","✕");db.onclick=()=>delDB(`tasks/${t.id}`); row.appendChild(chk);row.appendChild(info);row.appendChild(db);list.appendChild(row); });
+  w.appendChild(list); return w;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CALENDAR
+// ══════════════════════════════════════════════════════════════════════════════
+function renderCal(events,clients) {
+  const w=el("div");
+  const firstDay=new Date(calS.year,calS.month,1).getDay(), dim=new Date(calS.year,calS.month+1,0).getDate(), todayStr=new Date().toISOString().split("T")[0];
+  const calBox=el("div","background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);margin-bottom:14px");
+  const hd=el("div","display:flex;justify-content:space-between;align-items:center;margin-bottom:12px");
+  const pv=el("button",SB("#6366F1"),"‹ Prev");pv.onclick=()=>{if(calS.month===0){calS.month=11;calS.year--;}else calS.month--;render();};
+  const nx=el("button",SB("#6366F1"),"Next ›");nx.onclick=()=>{if(calS.month===11){calS.month=0;calS.year++;}else calS.month++;render();};
+  hd.appendChild(pv);hd.appendChild(el("div","font-weight:800;font-size:15px;color:#1E1B4B",`${MONTHS[calS.month]} ${calS.year}`));hd.appendChild(nx);calBox.appendChild(hd);
+  const dh=el("div","display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px");
+  WDAYS.forEach(d=>dh.appendChild(el("div","text-align:center;font-size:10px;font-weight:700;color:#94A3B8",d)));calBox.appendChild(dh);
+  const grid=el("div","display:grid;grid-template-columns:repeat(7,1fr);gap:2px");
+  for(let i=0;i<firstDay;i++) grid.appendChild(el("div"));
+  for(let d=1;d<=dim;d++){ const ds=`${calS.year}-${String(calS.month+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`,evs=events.filter(e=>e.date===ds),isT=ds===todayStr; const cell=el("div",`min-height:42px;border-radius:6px;padding:3px 2px;cursor:pointer;background:${isT?"#EEF2FF":"#FAFBFC"};border:${isT?"2px solid #6366F1":"1px solid #F1F5F9"}`); cell.innerHTML=`<div style="font-size:10px;font-weight:${isT?800:500};color:${isT?"#4338CA":"#374151"};text-align:center">${d}</div>`; evs.slice(0,2).forEach(e=>{ const ev=el("div",`background:${EV[e.type]};color:#fff;font-size:7px;border-radius:3px;padding:1px 2px;margin-top:1px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:600;cursor:pointer`,`${e.time} ${e.type}`); ev.onclick=ev2=>{ev2.stopPropagation();calS.editId=e.id;calS.form={...e};calS.showModal=true;render();}; cell.appendChild(ev); }); if(evs.length>2)cell.appendChild(el("div","font-size:8px;color:#94A3B8;text-align:center",`+${evs.length-2}`)); cell.onclick=()=>{calS.form={date:ds,time:"09:00",type:"Viewing",address:"",client:"",notes:""};calS.editId=null;calS.showModal=true;render();}; grid.appendChild(cell); }
+  calBox.appendChild(grid);
+  const leg=el("div","display:flex;gap:10px;margin-bottom:14px;align-items:center");
+  Object.entries(EV).forEach(([t,c])=>{ const d=el("div","display:flex;align-items:center;gap:5px;font-size:12px"); d.innerHTML=`<div style="width:10px;height:10px;border-radius:2px;background:${c}"></div><span style="color:#64748B">${t}</span>`; leg.appendChild(d); });
+  const aeb=el("button",BS("#6366F1")+";margin-left:auto;font-size:12px;padding:6px 12px","+ Add Event");aeb.onclick=()=>{calS.form={date:"",time:"09:00",type:"Viewing",address:"",client:"",notes:""};calS.editId=null;calS.showModal=true;render();};leg.appendChild(aeb);
+  const upBox=el("div","background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,0.06)","<div style='font-weight:700;color:#1E1B4B;margin-bottom:10px;font-size:14px'>📋 Upcoming Events</div>");
+  const up=events.filter(e=>e.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
+  if(!up.length)upBox.appendChild(empt("No upcoming events."));
+  up.forEach(e=>{ const row=el("div",`border-left:4px solid ${EV[e.type]};background:#F8FAFC;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start`); row.innerHTML=`<div><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px"><span style="background:${EV[e.type]};color:#fff;font-size:9px;padding:1px 7px;border-radius:10px;font-weight:700">${e.type}</span><span style="font-size:11px;color:#64748B">${e.date} @ ${e.time}</span></div><div style="font-weight:700;font-size:13px;color:#1E1B4B">${e.address}</div>${e.client?`<div style="font-size:11px;color:#64748B">👤 ${e.client}</div>`:""}${e.notes?`<div style="font-size:11px;color:#94A3B8">📝 ${e.notes}</div>`:""}</div>`; const btns=el("div","display:flex;gap:5px;flex-shrink:0"); const eb=el("button",SB("#F59E0B"),"Edit");eb.onclick=()=>{calS.editId=e.id;calS.form={...e};calS.showModal=true;render();}; const db=el("button",SB("#EF4444"),"Delete");db.onclick=()=>{if(confirm("Delete?"))delDB(`events/${e.id}`);}; btns.appendChild(eb);btns.appendChild(db);row.appendChild(btns);upBox.appendChild(row); });
+  w.appendChild(calBox);w.appendChild(leg);w.appendChild(upBox);
+  if(calS.showModal){ const f=calS.form; const m=modal(calS.editId?"Edit Event":"Add Event",()=>{calS.showModal=false;render();}); m.bx.appendChild(fld("Event Type",sel(Object.keys(EV),f.type,v=>{calS.form.type=v;}))); m.bx.appendChild(fld("Date",inp("date",f.date,v=>{calS.form.date=v;}))); m.bx.appendChild(fld("Time",inp("time",f.time,v=>{calS.form.time=v;}))); m.bx.appendChild(fld("Property Address",inp("text",f.address,v=>{calS.form.address=v;}))); const ci=inp("text",f.client||"",v=>{calS.form.client=v;});ci.placeholder="Start typing..."; const dl=document.createElement("datalist");dl.id="cal-cl";clients.forEach(c=>{const o=document.createElement("option");o.value=c.name;dl.appendChild(o);});ci.setAttribute("list","cal-cl");m.bx.appendChild(dl); m.bx.appendChild(fld("Client (optional)",ci)); m.bx.appendChild(fld("Notes (optional)",ta(f.notes||"",v=>{calS.form.notes=v;}))); const sb=el("button",BS("#6366F1"),"Save Event");sb.onclick=()=>{if(!f.address||!f.date)return;if(calS.editId)updDB(`events/${calS.editId}`,{...f,id:calS.editId});else{const id=uid();setDB(`events/${id}`,{...f,id});}calS.showModal=false;render();};m.bx.appendChild(sb);w.appendChild(m.ov); }
+  return w;
+}
+
+render();
+</script>
 </body>
 </html>
