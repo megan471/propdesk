@@ -18,8 +18,9 @@
 <div id="root"></div>
 
 <script type="module">
-import { initializeApp }                              from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { initializeApp }                                    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, remove, update }  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 // ── FIREBASE CONFIG ───────────────────────────────────────────────────────────
 const app = initializeApp({
@@ -32,16 +33,24 @@ const app = initializeApp({
   appId:             "1:860690311625:web:a45d93e850c176982b2018"
 });
 const db = getDatabase(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
 const dbRef  = path => ref(db, path);
 const setDB  = (path, data) => set(dbRef(path), data);
 const delDB  = path => remove(dbRef(path));
 const updDB  = (path, data) => update(dbRef(path), data);
 const listen = (path, cb) => onValue(dbRef(path), s => cb(s.val()));
 
+// Allowed Google accounts
+const ALLOWED_EMAILS = [
+  "karenrobinson24@outlook.com",
+  "megan@bundlemedia.africa",
+];
+
 // ── USERS ─────────────────────────────────────────────────────────────────────
 const USERS = [
-  { name:"Karen", pin:"1998", color:"#6366F1", icon:"👩‍💼" },
-  { name:"Megan", pin:"1995", color:"#EC4899", icon:"👩‍💻" },
+  { name:"Karen", pin:"1998", color:"#6366F1", icon:"👩‍💼", email:"karenrobinson24@outlook.com" },
+  { name:"Megan", pin:"1995", color:"#EC4899", icon:"👩‍💻", email:"megan@bundlemedia.africa" },
 ];
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -86,7 +95,7 @@ function modal(title, onClose) {
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let S = { user:null, tab:"dashboard", clients:{}, tasks:{}, commission:{}, events:{}, loading:true };
+let S = { user:null, googleUser:null, tab:"dashboard", clients:{}, tasks:{}, commission:{}, events:{}, loading:true };
 let loginS = { selected:null, pin:"", error:"" };
 let clientS = { roleTab:"All", statusTab:"All", showModal:false, editId:null, viewId:null, form:{name:"",cell:"",email:"",address:"",price:"",status:"Current",role:"Buyer",notes:""} };
 let commS   = { tab:"Pending", showModal:false, form:{property:"",salePrice:"",commPct:"5.5",splitPct:"60",paid:false} };
@@ -97,10 +106,52 @@ let contactSearch = "";
 function render() {
   const root = document.getElementById("root");
   root.innerHTML = "";
+  if (!S.googleUser) { root.appendChild(renderGoogleLogin()); return; }
   root.appendChild(S.user ? renderApp() : renderLogin());
 }
 
+// ── GOOGLE LOGIN ──────────────────────────────────────────────────────────────
+function renderGoogleLogin() {
+  const wrap=el("div","min-height:100vh;background:linear-gradient(135deg,#1E1B4B,#4338CA,#7C3AED);display:flex;align-items:center;justify-content:center");
+  const card=el("div","background:#fff;border-radius:24px;padding:40px 32px;width:90%;max-width:360px;box-shadow:0 30px 80px rgba(0,0,0,0.3);text-align:center");
+  card.innerHTML=`
+    <div style="font-size:42px;margin-bottom:8px">🏡</div>
+    <div style="font-weight:800;font-size:24px;color:#1E1B4B;margin-bottom:4px">PropDesk</div>
+    <div style="font-size:12px;color:#94A3B8;margin-bottom:32px">Property Agent CRM</div>
+    <div style="font-size:13px;color:#374151;margin-bottom:20px;font-weight:500">Sign in to continue</div>
+  `;
+  const btn=el("button","display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 20px;border:1.5px solid #E2E8F0;border-radius:12px;background:#fff;cursor:pointer;font-size:14px;font-weight:600;color:#374151;box-shadow:0 2px 8px rgba(0,0,0,0.08)");
+  btn.innerHTML=`<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google`;
+  btn.onclick = async () => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const email = result.user.email;
+      if (!ALLOWED_EMAILS.includes(email)) {
+        await signOut(auth);
+        alert("Access denied. This app is for authorised users only.");
+        return;
+      }
+      S.googleUser = result.user;
+      // Auto-match to user profile
+      const matched = USERS.find(u => u.email === email);
+      if (matched) loginS.selected = matched;
+      render();
+    } catch(e) { console.error(e); }
+  };
+  card.appendChild(btn);
+  card.innerHTML += `<div style="font-size:11px;color:#94A3B8;margin-top:16px">🔒 Authorised users only</div>`;
+  wrap.appendChild(card);
+  return wrap;
+}
+
 // ── LISTENERS ─────────────────────────────────────────────────────────────────
+// ── AUTH STATE ────────────────────────────────────────────────────────────────
+onAuthStateChanged(auth, googleUser => {
+  S.googleUser = googleUser;
+  if (!googleUser) { S.user = null; }
+  render();
+});
+
 listen("clients",    v=>{ S.clients=v||{};    render(); });
 listen("tasks",      v=>{ S.tasks=v||{};      render(); });
 listen("commission", v=>{ S.commission=v||{}; render(); });
@@ -157,7 +208,7 @@ function renderApp() {
   hdr.innerHTML=`<div><span style="font-weight:800;font-size:17px">🏡 PropDesk</span><span style="font-size:11px;margin-left:8px;color:#A5B4FC">Property Agent CRM</span></div>`;
   const badge=el("div","display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border-radius:20px;padding:5px 12px");
   badge.innerHTML=`<span style="font-size:14px">${S.user.icon}</span><span style="font-size:12px;font-weight:600">${S.user.name}</span>`;
-  const lk=el("button","background:none;border:none;color:#A5B4FC;cursor:pointer;font-size:11px;margin-left:4px","🔒 Lock"); lk.onclick=()=>{S.user=null;render();};
+  const lk=el("button","background:none;border:none;color:#A5B4FC;cursor:pointer;font-size:11px;margin-left:4px","🔒 Lock"); lk.onclick=async()=>{ await signOut(auth); S.user=null; S.googleUser=null; render(); };
   badge.appendChild(lk); hdr.appendChild(badge);
   // Nav
   const nav=el("div","background:#fff;border-bottom:2px solid #E2E8F0;display:flex;overflow-x:auto");
