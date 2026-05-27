@@ -20,7 +20,6 @@
 <script type="module">
 import { initializeApp }                                    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getDatabase, ref, set, onValue, remove, update }  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 // ── FIREBASE CONFIG ───────────────────────────────────────────────────────────
 const app = initializeApp({
@@ -33,25 +32,16 @@ const app = initializeApp({
   appId:             "1:860690311625:web:a45d93e850c176982b2018"
 });
 const db = getDatabase(app);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
 const dbRef  = path => ref(db, path);
 const setDB  = (path, data) => set(dbRef(path), data);
 const delDB  = path => remove(dbRef(path));
 const updDB  = (path, data) => update(dbRef(path), data);
 const listen = (path, cb) => onValue(dbRef(path), s => cb(s.val()));
 
-// Allowed Google accounts
-const ALLOWED_EMAILS = [
-  "karenrobinson24@outlook.com",
-  "karenr@jawitz.co.za",
-  "megan@bundlemedia.africa",
-];
-
 // ── USERS ─────────────────────────────────────────────────────────────────────
 const USERS = [
-  { name:"Karen", pin:"1998", color:"#6366F1", icon:"👩‍💼", email:"karenr@jawitz.co.za" },
-  { name:"Megan", pin:"1995", color:"#EC4899", icon:"👩‍💻", email:"megan@bundlemedia.africa" },
+  { name:"Karen", pin:"1998", color:"#6366F1", icon:"👩‍💼" },
+  { name:"Megan", pin:"1995", color:"#EC4899", icon:"👩‍💻" },
 ];
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -96,7 +86,7 @@ function modal(title, onClose) {
 }
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let S = { user:null, googleUser:null, tab:"dashboard", clients:{}, tasks:{}, commission:{}, events:{}, loading:true };
+let S = { user:null, tab:"dashboard", clients:{}, tasks:{}, commission:{}, events:{}, loading:true };
 let loginS = { selected:null, pin:"", error:"" };
 let clientS = { roleTab:"All", statusTab:"All", showModal:false, editId:null, viewId:null, form:{name:"",cell:"",email:"",address:"",price:"",status:"Current",role:"Buyer",notes:""} };
 let commS   = { tab:"Pending", showModal:false, form:{property:"",salePrice:"",commPct:"5.5",splitPct:"60",paid:false} };
@@ -172,13 +162,6 @@ getRedirectResult(auth).then(result => {
 }
 
 // ── LISTENERS ─────────────────────────────────────────────────────────────────
-// ── AUTH STATE ────────────────────────────────────────────────────────────────
-onAuthStateChanged(auth, googleUser => {
-  S.googleUser = googleUser;
-  if (!googleUser) { S.user = null; }
-  render();
-});
-
 listen("clients",    v=>{ S.clients=v||{};    render(); });
 listen("tasks",      v=>{ S.tasks=v||{};      render(); });
 listen("commission", v=>{ S.commission=v||{}; render(); });
@@ -235,7 +218,7 @@ function renderApp() {
   hdr.innerHTML=`<div><span style="font-weight:800;font-size:17px">🏡 PropDesk</span><span style="font-size:11px;margin-left:8px;color:#A5B4FC">Property Agent CRM</span></div>`;
   const badge=el("div","display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.12);border-radius:20px;padding:5px 12px");
   badge.innerHTML=`<span style="font-size:14px">${S.user.icon}</span><span style="font-size:12px;font-weight:600">${S.user.name}</span>`;
-  const lk=el("button","background:none;border:none;color:#A5B4FC;cursor:pointer;font-size:11px;margin-left:4px","🔒 Lock"); lk.onclick=async()=>{ await signOut(auth); S.user=null; S.googleUser=null; render(); };
+  const lk=el("button","background:none;border:none;color:#A5B4FC;cursor:pointer;font-size:11px;margin-left:4px","🔒 Lock"); lk.onclick=()=>{S.user=null;render();};
   badge.appendChild(lk); hdr.appendChild(badge);
   // Nav
   const nav=el("div","background:#fff;border-bottom:2px solid #E2E8F0;display:flex;overflow-x:auto");
